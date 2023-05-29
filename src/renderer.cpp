@@ -24,7 +24,7 @@
 // Since the relevant functions have been defined since Win7, and we're only using a johnny-come-lately *parameter*,
 // the SDR-white-level-for-HDR autodetection code should fail gracefully with a bad parameter error on older versions of Windows.
 // In theory at least. (Not tested yet.)
-// It does fail gracefully on Wine. 
+// It does fail gracefully on Wine.
 #define WINVER 0x0A00
 #define _WIN32_WINNT 0x0A00
 
@@ -137,7 +137,7 @@ void Renderer::setCommonUniforms()
         NULL
     };
     if (uniform_log) ffnx_trace("%s: FSTexFlags XYZW(isNmlTextureLoaded %f, isPbrTextureLoaded %f, isIblTextureLoaded %f, NULL)\n", __func__, internalState.FSTexFlags[0], internalState.FSTexFlags[1], internalState.FSTexFlags[2]);
-    
+
     internalState.FSMovieFlags = {
         (float)internalState.bIsMovieColorMatrix,
         (float)internalState.bIsMovieColorGamut,
@@ -710,15 +710,15 @@ void Renderer::AssignGamutLUT()
     // So, for now I'm using the LUTs for the first step for both SDR and HDR,
     // and I'm putting this comment here in case we ever figure out how to tolerate out-of-bounds values
     //if (internalState.bIsHDR) return;
-    
-    
+
+
     // NTSCJ mode post-processing
     if ((backendProgram == RendererProgram::POSTPROCESSING) && (internalState.bIsOverallColorGamut == COLORGAMUT_NTSCJ)){
         useTexture(GLUTHandleNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
     }
     // Movies and override flag
     // Note: Override flag currently does nothing because it's never set to true anywhere
-    // The intent is to eventually have a way to say "I want to display a NTSCJ asset in sRGB mode" or "I want to display a sRGB asset in NTSCJ mode." 
+    // The intent is to eventually have a way to say "I want to display a NTSCJ asset in sRGB mode" or "I want to display a sRGB asset in NTSCJ mode."
     else {
         if (internalState.bIsOverallColorGamut == COLORGAMUT_SRGB){
             if ((internalState.bIsMovieColorGamut == COLORGAMUT_NTSCJ) || internalState.bIsOverrideGamut){
@@ -757,8 +757,8 @@ void Renderer::AssignGamutLUT()
                 }
             }
         }
-            
-    }    
+
+    }
     return;
 }
 
@@ -801,7 +801,7 @@ void Renderer::init()
             // See also: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_sdr_white_level
             // Autodetection may fail on some monitor models.
             // Autodetection WILL fail on Windows older than Win10 Fall Creators Update (Version 1709) and WILL fail on WINE (at least as of WINE 7.22)
-            
+
             // First, enumerate the DISPLAYCONFIG_PATH_INFO for all monitors.
             // Code borrowed from Microsoft's example: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig#examples
             std::vector<DISPLAYCONFIG_PATH_INFO> paths;
@@ -814,39 +814,39 @@ void Renderer::init()
                 // Determine how many path and mode structures to allocate
                 UINT32 pathCount, modeCount;
                 monresult = GetDisplayConfigBufferSizes(flags, &pathCount, &modeCount);
-                
+
                 if (monresult != ERROR_SUCCESS){
                     if (trace_all || trace_renderer) ffnx_trace("Renderer::init(): Autodetection of SDR white level for HDR failed. Cannot enumerate monitors. GetDisplayConfigBufferSizes() failed with error code %i.\n", monresult);
                     break;
                 }
                 gotbuffersizes = true;
-                
+
                 // Allocate the path and mode arrays
                 paths.resize(pathCount);
                 modes.resize(modeCount);
-                
+
                 // Get all active paths and their modes
                 monresult = QueryDisplayConfig(flags, &pathCount, paths.data(), &modeCount, modes.data(), nullptr);
-                
+
                 // The function may have returned fewer paths/modes than estimated
                 paths.resize(pathCount);
                 modes.resize(modeCount);
-                
+
                 // It's possible that between the call to GetDisplayConfigBufferSizes and QueryDisplayConfig
                 // that the display state changed, so loop on the case of ERROR_INSUFFICIENT_BUFFER.
             } while (monresult == ERROR_INSUFFICIENT_BUFFER);
-            
+
             if (monresult != ERROR_SUCCESS){
                 if (gotbuffersizes){
                     if (trace_all || trace_renderer) ffnx_trace("Renderer::init(): Autodetection of SDR white level for HDR failed. Cannot enumerate monitors. QueryDisplayConfig() failed with error code %i.\n", monresult);
                 }
             }
-            else { 
+            else {
                 // loop over monitors and take the SDR white level of the first HDR monitor we find.
                 int pathidx = -1;
                 for (auto& path : paths) {
                     pathidx++;
-                                    
+
                     // Check if this monitor is HDR capable and HDR enabled
                     // Borrowed from these two examples:
                     // https://forum.doom9.org/showthread.php?s=33dc0ad84a0997fce56710b3959e0415&p=1897630#post1897630
@@ -865,7 +865,7 @@ void Renderer::init()
                         if (trace_all || trace_renderer) ffnx_trace("Renderer::init(): Autodetection of SDR white level for HDR determined that monitor #%i is not an HDR monitor or HDR is not enabled. Checking next monitor (if any)...\n", pathidx);
                         continue;
                     }
-                    
+
                     // If we found an HDR monitor, then query its SDR white level
                     // Code borrowed from Google Chrome: https://chromium.googlesource.com/chromium/src/+/c71f15ab1ace78c7efeeeda9f8552b4af9db2877/ui/display/win/screen_win.cc#112
                     DISPLAYCONFIG_SDR_WHITE_LEVEL white_level = {};
@@ -888,9 +888,9 @@ void Renderer::init()
                     ffnx_info("SDR white level for HDR successfully autodetected as %i nits.\n", (int)hdr_max_nits);
                     usedefaultnits = false;
                     break;
-                
+
                 } // end for (auto& path : paths)
-                
+
             } // end else (monresult == ERROR_SUCCESS)
             if (usedefaultnits){
                 ffnx_info("Autodetection of SDR white level for HDR failed. Assuming default value of 200 nits.\n");
@@ -901,10 +901,10 @@ void Renderer::init()
 
         bgfx::reset(window_size_x, window_size_y, bgfxInit.resolution.reset, bgfxInit.resolution.format);
     } //end if HDR
-    
+
     // testing
     {
-        
+
     } // end testing scope
 
     internalState.texHandlers.resize(RendererTextureSlot::COUNT, BGFX_INVALID_HANDLE);
@@ -1080,104 +1080,104 @@ void Renderer::prepareEnvBrdf()
 void Renderer::prepareGamutLUTs()
 {
     static char fullpath[MAX_PATH];
-    
+
     if (bgfx::isValid(GLUTHandleNTSCJtoSRGB))
         bgfx::destroy(GLUTHandleNTSCJtoSRGB);
-    
+
     sprintf(fullpath, "%s/shaders/glut_ntscj_to_srgb.png", basedir);
 
     uint32_t width, height, mipCount = 0;
     GLUTHandleNTSCJtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleNTSCJtoSRGB.idx) GLUTHandleNTSCJtoSRGB = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleSMPTECtoSRGB))
         bgfx::destroy(GLUTHandleSMPTECtoSRGB);
-    
+
     sprintf(fullpath, "%s/shaders/glut_smptec_to_srgb.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleSMPTECtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleSMPTECtoSRGB.idx) GLUTHandleSMPTECtoSRGB = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleEBUtoSRGB))
         bgfx::destroy(GLUTHandleEBUtoSRGB);
-    
+
     sprintf(fullpath, "%s/shaders/glut_ebu_to_srgb.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleEBUtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleEBUtoSRGB.idx) GLUTHandleEBUtoSRGB = BGFX_INVALID_HANDLE;
-    
-    
+
+
     // For SDR, we're using "inverse" conversions to go to NTSCJ in the hopes that the expansion involved
     // will counteract the compression in the final NTSCJ to sRGB conversion.
     // This isn't exactly kosher for the SMPTEC and EBU cases, but they're close enough to sRGB
     // that doing the expansion probably gives closer to accurate results than not doing it.
     // (Don't do this for HDR, as the final conversion to rec2020 had no compression.)
-    
+
     if (bgfx::isValid(GLUTHandleInverseNTSCJtoSRGB))
         bgfx::destroy(GLUTHandleInverseNTSCJtoSRGB);
-    
+
     sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_srgb.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleInverseNTSCJtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleInverseNTSCJtoSRGB.idx) GLUTHandleInverseNTSCJtoSRGB = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleInverseNTSCJtoSMPTEC))
         bgfx::destroy(GLUTHandleInverseNTSCJtoSMPTEC);
-    
+
     sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_smptec.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleInverseNTSCJtoSMPTEC = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleInverseNTSCJtoSMPTEC.idx) GLUTHandleInverseNTSCJtoSMPTEC = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleInverseNTSCJtoEBU))
         bgfx::destroy(GLUTHandleInverseNTSCJtoEBU);
-    
+
     sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_ebu.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleInverseNTSCJtoEBU = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleInverseNTSCJtoEBU.idx) GLUTHandleInverseNTSCJtoEBU = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleSRGBtoNTSCJ))
         bgfx::destroy(GLUTHandleSRGBtoNTSCJ);
-    
+
     sprintf(fullpath, "%s/shaders/glut_srgb_to_ntscj.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleSRGBtoNTSCJ = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleSRGBtoNTSCJ.idx) GLUTHandleSRGBtoNTSCJ = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleSMPTECtoNTSCJ))
         bgfx::destroy(GLUTHandleSMPTECtoNTSCJ);
-    
+
     sprintf(fullpath, "%s/shaders/glut_smptec_to_ntscj.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleSMPTECtoNTSCJ = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleSMPTECtoNTSCJ.idx) GLUTHandleSMPTECtoNTSCJ = BGFX_INVALID_HANDLE;
-    
-    
+
+
     if (bgfx::isValid(GLUTHandleEBUtoNTSCJ))
         bgfx::destroy(GLUTHandleEBUtoNTSCJ);
-    
+
     sprintf(fullpath, "%s/shaders/glut_ebu_to_ntscj.png", basedir);
 
     width = height = mipCount = 0;
     GLUTHandleEBUtoNTSCJ = createTextureHandle(fullpath, &width, &height, &mipCount, false);
     if (!GLUTHandleEBUtoNTSCJ.idx) GLUTHandleEBUtoNTSCJ = BGFX_INVALID_HANDLE;
-    
+
     return;
-    
+
 }
 
 void Renderer::shutdown()
@@ -1317,7 +1317,7 @@ void Renderer::draw(bool uniformsAlreadyAttached)
 
     // set up a gamut LUT if we need one
     AssignGamutLUT();
-    
+
     // Bind textures in pipeline
     bindTextures();
 

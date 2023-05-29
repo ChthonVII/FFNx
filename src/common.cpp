@@ -851,7 +851,7 @@ int common_create_window(HINSTANCE hInstance, struct game_obj* game_object)
 				newRenderer.prepareFFNxLogo();
 
 				newRenderer.prepareEnvBrdf();
-                
+
 				newRenderer.prepareGamutLUTs();
 
 				// perform any additional initialization that requires the rendering environment to be set up
@@ -933,6 +933,9 @@ uint32_t common_init(struct game_obj *game_object)
 	}
 
 	proxyWndProc = true;
+
+	// Small rendering loop to draw the FFNx logo before the game starts
+	drawFFNxLogo(game_object);
 
 	return true;
 }
@@ -3329,42 +3332,47 @@ void ffnx_inject_driver(struct game_obj* game_object)
 	VRASS(game_object, create_gfx_driver, new_dll_graphics_driver);
 }
 
-#if defined(__cplusplus)
-}
-#endif
-
-constexpr int FFNX_LOGO_FRAME_COUNT = 180;
-int ffnx_logo_current_frame = 0;
-
-bool drawFFNxLogoFrame(struct game_obj* game_object)
+void drawFFNxLogo(struct game_obj* game_object)
 {
-	if (ffnx_logo_current_frame >= FFNX_LOGO_FRAME_COUNT) {
-		newRenderer.setOverallColorGamut(enable_ntscj_gamut_mode ? COLORGAMUT_NTSCJ : COLORGAMUT_SRGB); // set the gamut back to what it was before newRenderer.drawFFNxLogo() changed it
-		return false;
-	}
+
+	//if (ffnx_logo_current_frame >= FFNX_LOGO_FRAME_COUNT) {
+	//	newRenderer.setOverallColorGamut(enable_ntscj_gamut_mode ? COLORGAMUT_NTSCJ : COLORGAMUT_SRGB); // set the gamut back to what it was before newRenderer.drawFFNxLogo() changed it
+	//	return false;
+	//}
 
 	VOBJ(game_obj, game_object, game_object);
 
-	int fade_frame_count = FFNX_LOGO_FRAME_COUNT / 3;
+	static time_t last_gametime;
+	time_t gametime;
+	double framerate = 60.0f;
+
+	int frame_count = 180;
+	int fade_frame_count = frame_count / 3;
 	float fade = 0.0;
 
-	if(ffnx_logo_current_frame < fade_frame_count)
-		fade = ffnx_logo_current_frame / static_cast<float>(fade_frame_count);
-	else if(ffnx_logo_current_frame < 2 * fade_frame_count)
-		fade = 1.0f;
-	else
-		fade = 1.0f - (ffnx_logo_current_frame - 2 * fade_frame_count) / static_cast<float>(fade_frame_count);
+	qpc_get_time(&last_gametime);
 
-	newRenderer.drawFFNxLogo(fade);
+	for(int i = 0; i < frame_count; ++i)
+	{
+		if(i < fade_frame_count)
+			fade =  i / static_cast<float>(fade_frame_count);
+		else if(i < 2 * fade_frame_count)
+			fade = 1.0f;
+		else
+			fade =  1.0f - (i - 2 * fade_frame_count) / static_cast<float>(fade_frame_count);
 
-	common_flip(game_object);
+		newRenderer.drawFFNxLogo(fade);
 
-	ffnx_logo_current_frame++;
+		common_flip(game_object);
 
-	return true;
+		do qpc_get_time(&gametime);
+		while ((gametime > last_gametime) && qpc_diff_time(&gametime, &last_gametime, NULL) < VREF(game_object, countspersecond) / framerate);
+
+		last_gametime = gametime;
+	}
+	newRenderer.setOverallColorGamut(enable_ntscj_gamut_mode ? COLORGAMUT_NTSCJ : COLORGAMUT_SRGB); // set the gamut back to what it was before newRenderer.drawFFNxLogo() changed it
 }
 
-void stopDrawFFNxLogo()
-{
-	ffnx_logo_current_frame = FFNX_LOGO_FRAME_COUNT;
+#if defined(__cplusplus)
 }
+#endif
