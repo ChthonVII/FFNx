@@ -10,7 +10,10 @@
 ## FF7
 
 - Core: Fix core game bug issue happening on the wind wall fields `woa_*` ( https://github.com/julianxhokaxhiu/FFNx/issues/797 )
+<<<<<<< HEAD
 - Core: Fix FADE opcode fading color when type=2 is used ( https://github.com/julianxhokaxhiu/FFNx/issues/805 )
+=======
+>>>>>>> c5a81f6 (FF7: Fix 60FPS manipulate, poison and regen effect animation in battle (#819))
 - 60FPS: Fix escape magic animation speed (https://github.com/julianxhokaxhiu/FFNx/issues/794)
 - 60FPS: Fix manipulate, poison and regen effect animation in battle (https://github.com/julianxhokaxhiu/FFNx/issues/817)
 
