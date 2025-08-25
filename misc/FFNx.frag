@@ -104,7 +104,27 @@ uniform vec4 gameScriptedLightColor;
 
 void main()
 {
-    vec4 color = vec4(toLinearBT1886Appx1Fast(v_color0.rgb), v_color0.a);
+    // This stanza applies to solid colors. (For instance, the battle mode character selection triangles in FF7.)
+    // color will get clobbered later if there's a texture.
+    vec4 color = v_color0;
+    // In this default shader, lighting is applied in gamma space so that it does better match the original lighting
+    // Also do it BEFORE linearization/gamut conversion
+    if (gameLightingMode == GAME_LIGHTING_PER_PIXEL)
+    {
+        vec3 normal = normalize(v_normal0);
+        vec3 worldNormal = mul(invViewMatrix, vec4(normal, 0)).xyz;
+        float dotLight1 = saturate(dot(worldNormal, gameLightDir1.xyz));
+        float dotLight2 = saturate(dot(worldNormal, gameLightDir2.xyz));
+        float dotLight3 = saturate(dot(worldNormal, gameLightDir3.xyz));
+        vec3 light1Ambient = gameLightColor1.rgb * dotLight1 * dotLight1;
+        vec3 light2Ambient = gameLightColor2.rgb * dotLight2 * dotLight2;
+        vec3 light3Ambient = gameLightColor3.rgb * dotLight3 * dotLight3;
+        vec3 lightAmbient = gameScriptedLightColor.rgb * (gameGlobalLightColor.rgb + light1Ambient + light2Ambient + light3Ambient);
+        color.rgb *= gameGlobalLightColor.w * lightAmbient;
+    }
+    // Now linearize, possibly with gamut conversion
+    color.rgb = toLinearSRGBSomehow(color.srgb, isOverallSRGBColorGamut);
+    // TODO: do we really want to linearize this when modulateAlpha is true?
 
     if (isTexture)
     {
@@ -259,9 +279,13 @@ void main()
             {
                 if(all(equal(texture_color.rgb,vec3_splat(0.0)))) discard;
 
-                // This was previously in gamma space, so linearize again.
-                //texture_color.rgb = toLinearBT1886Appx1Fast(texture_color.rgb);
+                // This was previously in sRGB gamma space, so linearize again.
+                texture_color.rgb = toLinear(texture_color.rgb);
 
+            }
+            else
+            {
+                // This texture is in gamma space
             }
 
             // Use CRT gamma for all textures (no longer using BGFX's built-in sRGB linearization)
@@ -275,7 +299,7 @@ void main()
             else
             {
                 color.rgb *= texture_color.rgb;
-			    color.a = texture_color.a;
+                color.a = texture_color.a;
             }
         }
     }

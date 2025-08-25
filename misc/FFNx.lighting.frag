@@ -119,6 +119,9 @@ uniform vec4 gameScriptedLightColor;
 
 void main()
 {
+    // This stanza applies to solid colors. (For instance, the battle mode character selection triangles in FF7.)
+    // color will get clobbered later if there's a texture.
+    // TODO: Shouldn't this be linearized?
     vec4 color = v_color0;
     vec4 color_nml = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 color_pbr = vec4(0.0, 0.0, 0.0, 0.0);
@@ -295,7 +298,7 @@ void main()
             else
             {
                 color.rgb *= texture_color.rgb;
-			    color.a = texture_color.a;
+                color.a = texture_color.a;
             }
         }
     }
