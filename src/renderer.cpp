@@ -712,6 +712,8 @@ void Renderer::bindTextures()
                         // Specially handled, move on
                         continue;
                     case RendererTextureSlot::TEX_G_LUT:
+                    case RendererTextureSlot::TEX_M_LUT:
+                    case RendererTextureSlot::TEX_B_LUT:
                         flags |= BGFX_SAMPLER_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP;
                         break;
                     default:
@@ -730,63 +732,58 @@ void Renderer::bindTextures()
 
 void Renderer::AssignGamutLUT()
 {
-	// Since HDR uses the super-wide rec2020 gamut, it doesn't need a gamut (compression) mapping algorithm,
-	// so it would be better to use the old matrix-based conversions instead of the LUTs that embody a GMA.
-	// That's what we do in post-processing.
-	// However, in one case we have two serial conversions happening:
-	// Movies where the movie's gamut isn't the same as the selected gamut mode
-	// What I'd *like* to do is to do matrix-based conversions for the first round,
-	// then *tolerate* the out-of-bounds values until post processing,
-	// then the final conversion to rec2020 will bring those values back in bounds.
-	// Unfortunately, I don't think the lighting code could tolerate out-of-bounds values.
-	// (Also, the gamma function would need to be changed to avoid calling pow() on a negative input.)
-	// So, for now I'm using the LUTs for the first step for both SDR and HDR,
-	// and I'm putting this comment here in case we ever figure out how to tolerate out-of-bounds values
-	//if (internalState.bIsHDR) return;
+  // slot TEX_G_LUT only ever uses INDEX_LUT_NTSCJ_TO_SRGB, if NTSC-J mode or NTSC-J movie
+  // slot TEX_M_LUT only ever uses INDEX_LUT_SMPTEC_TO_SRGB or INDEX_LUT_EBU_TO_SRGB, depending on movie
+  // slot TEX_B_LUT only ever uses INDEX_LUT_INVERSE_NTSCJ_TO_SRGB, if NTSC-J mode
 
+  // test
+  LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB); // load LUT if not already loaded
+  useTexture(GLUTHandleNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
+  LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_SRGB); // load LUT if not already loaded
+  useTexture(GLUTHandleInverseNTSCJtoSRGB.idx, RendererTextureSlot::TEX_B_LUT);
 
-	// NTSCJ mode post-processing
-	if ((backendProgram == RendererProgram::POSTPROCESSING) && (internalState.bIsOverallColorGamut == COLORGAMUT_NTSCJ)){
-		LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB); // load LUT if not already loaded
-		useTexture(GLUTHandleNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
-	}
-	// Movies
-	else {
-		if (internalState.bIsOverallColorGamut == COLORGAMUT_SRGB){
-			if (internalState.bIsMovieColorGamut == COLORGAMUT_NTSCJ){
-				LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB); // load LUT if not already loaded
-				useTexture(GLUTHandleNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
-			}
-			else if (internalState.bIsMovieColorGamut == COLORGAMUT_SMPTEC){
-				LoadGamutLUT(INDEX_LUT_SMPTEC_TO_SRGB); // load LUT if not already loaded
-				useTexture(GLUTHandleSMPTECtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
-			}
-			else if (internalState.bIsMovieColorGamut == COLORGAMUT_EBU){
-				LoadGamutLUT(INDEX_LUT_EBU_TO_SRGB); // load LUT if not already loaded
-				useTexture(GLUTHandleEBUtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
-			}
-		}
-		else if (internalState.bIsOverallColorGamut == COLORGAMUT_NTSCJ){
-			// This is slightly wrong for HDR, since the LUTs invert gamut compression that wouldn't happen in HDR.
-			// The consequence is that some colors near places where the P22 gamut exceeds the sRGB/SMPTE-C/EBU gamuts
-			// will appear slightly brighter and/or more saturated in HDR than they would if the round-trip were perfect.
-			// I don't think anyone will mind...
-			if (internalState.bIsMovieColorGamut == COLORGAMUT_SRGB){
-				LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_SRGB); // load LUT if not already loaded
-				useTexture(GLUTHandleInverseNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
-			}
-			else if (internalState.bIsMovieColorGamut == COLORGAMUT_SMPTEC){
-				LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_SMPTEC); // load LUT if not already loaded
-				useTexture(GLUTHandleInverseNTSCJtoSMPTEC.idx, RendererTextureSlot::TEX_G_LUT);
-			}
-			else if (internalState.bIsMovieColorGamut == COLORGAMUT_EBU){
-				LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_EBU); // load LUT if not already loaded
-				useTexture(GLUTHandleInverseNTSCJtoEBU.idx, RendererTextureSlot::TEX_G_LUT);
-			}
-		}
+  if (internalState.bIsMovieColorGamut == COLORGAMUT_SMPTEC){
+      LoadGamutLUT(INDEX_LUT_SMPTEC_TO_SRGB); // load LUT if not already loaded
+      useTexture(GLUTHandleSMPTECtoSRGB.idx, RendererTextureSlot::TEX_M_LUT);
+  }
+  else if (internalState.bIsMovieColorGamut == COLORGAMUT_EBU){
+    LoadGamutLUT(INDEX_LUT_EBU_TO_SRGB); // load LUT if not already loaded
+    useTexture(GLUTHandleEBUtoSRGB.idx, RendererTextureSlot::TEX_M_LUT);
+  }
 
-	}
-	return;
+  /*
+  // post-processing will only use INDEX_LUT_NTSCJ_TO_SRGB, if NTSC-J mode
+  if ((backendProgram == RendererProgram::POSTPROCESSING) && (internalState.bIsOverallColorGamut == COLORGAMUT_NTSCJ)){
+    LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB); // load LUT if not already loaded
+    useTexture(GLUTHandleNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
+  }
+  // movies and general gamut conversion
+  else {
+    // slot TEX_G_LUT
+    if ((internalState.bIsOverallColorGamut == COLORGAMUT_NTSCJ) || (internalState.bIsMovieColorGamut == COLORGAMUT_NTSCJ)){
+      LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB); // load LUT if not already loaded
+      useTexture(GLUTHandleNTSCJtoSRGB.idx, RendererTextureSlot::TEX_G_LUT);
+    }
+
+    // slot TEX_B_LUT
+    if (internalState.bIsOverallColorGamut == COLORGAMUT_NTSCJ){
+      LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_SRGB); // load LUT if not already loaded
+      useTexture(GLUTHandleInverseNTSCJtoSRGB.idx, RendererTextureSlot::TEX_B_LUT);
+    }
+
+    // slot TEX_M_LUT
+    if (internalState.bIsMovieColorGamut == COLORGAMUT_SMPTEC){
+      LoadGamutLUT(INDEX_LUT_SMPTEC_TO_SRGB); // load LUT if not already loaded
+      useTexture(GLUTHandleSMPTECtoSRGB.idx, RendererTextureSlot::TEX_M_LUT);
+    }
+    else if (internalState.bIsMovieColorGamut == COLORGAMUT_EBU){
+      LoadGamutLUT(INDEX_LUT_EBU_TO_SRGB); // load LUT if not already loaded
+      useTexture(GLUTHandleEBUtoSRGB.idx, RendererTextureSlot::TEX_M_LUT);
+    }
+
+  }
+  */
+  return;
 }
 
 // PUBLIC
@@ -1151,101 +1148,77 @@ void Renderer::prepareEnvBrdf()
 void Renderer::prepareGamutLUTs()
 {
 
-	// flush everything (they should have all initialized to BGFX_INVALID_HANDLE, but let's be careful)
-	if (bgfx::isValid(GLUTHandleNTSCJtoSRGB))
-		bgfx::destroy(GLUTHandleNTSCJtoSRGB);
-	if (bgfx::isValid(GLUTHandleSMPTECtoSRGB))
-		bgfx::destroy(GLUTHandleSMPTECtoSRGB);
-	if (bgfx::isValid(GLUTHandleEBUtoSRGB))
-		bgfx::destroy(GLUTHandleEBUtoSRGB);
-	if (bgfx::isValid(GLUTHandleInverseNTSCJtoSRGB))
-		bgfx::destroy(GLUTHandleInverseNTSCJtoSRGB);
-	if (bgfx::isValid(GLUTHandleInverseNTSCJtoSMPTEC))
-		bgfx::destroy(GLUTHandleInverseNTSCJtoSMPTEC);
-	if (bgfx::isValid(GLUTHandleInverseNTSCJtoEBU))
-		bgfx::destroy(GLUTHandleInverseNTSCJtoEBU);
+  // flush everything (they should have all initialized to BGFX_INVALID_HANDLE, but let's be careful)
+  if (bgfx::isValid(GLUTHandleNTSCJtoSRGB))
+    bgfx::destroy(GLUTHandleNTSCJtoSRGB);
+  if (bgfx::isValid(GLUTHandleSMPTECtoSRGB))
+    bgfx::destroy(GLUTHandleSMPTECtoSRGB);
+  if (bgfx::isValid(GLUTHandleEBUtoSRGB))
+    bgfx::destroy(GLUTHandleEBUtoSRGB);
+  if (bgfx::isValid(GLUTHandleInverseNTSCJtoSRGB))
+    bgfx::destroy(GLUTHandleInverseNTSCJtoSRGB);
 
-	// load only the LUTs we are likely to need
-	// consult the global setting so we don't get tripped up by renderer state changing to accomodate the FFNx logo
-	if (enable_ntscj_gamut_mode){
-		if (!internalState.bIsHDR){
-			// Final NTSC-J to sRGB conversion needs gamut compression mapping LUT
-			LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB);
-		}
-		// We will probably have some sRGB videos that must have a roundtrip conversion.
-		LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_SRGB);
-	}
-	// Most FF7 movies will need NTSC-J to sRGB conversion for sRGB mode
-	// (FF8 Steam edition movies were already converted)
-	else if(!ff8){
-		LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB);
-	}
+  // load LUTs we are likely to need
+  // we need NTSC-J to sRGB if NTSC-J mode or FF7 movies
+  if (enable_ntscj_gamut_mode || !ff8){
+      LoadGamutLUT(INDEX_LUT_NTSCJ_TO_SRGB);
+  }
+  // we need inverse NTSC-J to sRGB if NTSC-J mode
+  if (enable_ntscj_gamut_mode){
+      LoadGamutLUT(INDEX_LUT_INVERSE_NTSCJ_TO_SRGB);
+  }
 
-	// Any other LUTs we end up needing will be lazy loaded by AssignGamutLUT()
+  // Any other LUTs we end up needing will be lazy loaded by AssignGamutLUT()
 
-	return;
+  return;
 }
 
 void Renderer::LoadGamutLUT(GamutLUTIndexType whichLUT)
 {
 
-	static char fullpath[MAX_PATH];
-	uint32_t width = 0;
-	uint32_t height = 0;
-	uint32_t mipCount = 0;
+  static char fullpath[MAX_PATH];
+  uint32_t width = 0;
+  uint32_t height = 0;
+  uint32_t mipCount = 0;
 
-	// Note: It's important that the final parameter to createTextureHandle() -- isSrgb -- is false.
-	// Otherwise the sRGB gamma function will be applied to convert sRGB to linear RGB.
-	// But we don't want that because these LUTs are already in linear RGB.
+  // Note: It's important that the final parameter to createTextureHandle() -- isSrgb -- is false.
+  // Otherwise the sRGB gamma function will be applied to convert sRGB to linear RGB.
+  // But we don't want that because these LUTs are already in linear RGB.
 
-	switch (whichLUT){
-		case INDEX_LUT_NTSCJ_TO_SRGB:
-			if (!bgfx::isValid(GLUTHandleNTSCJtoSRGB)){
-				sprintf(fullpath, "%s/shaders/glut_ntscj_to_srgb.png", basedir);
-				GLUTHandleNTSCJtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
-				if (!GLUTHandleNTSCJtoSRGB.idx) GLUTHandleNTSCJtoSRGB = BGFX_INVALID_HANDLE;
-			}
-			break;
-		case INDEX_LUT_SMPTEC_TO_SRGB:
-			if (!bgfx::isValid(GLUTHandleSMPTECtoSRGB)){
-				sprintf(fullpath, "%s/shaders/glut_smptec_to_srgb.png", basedir);
-				GLUTHandleSMPTECtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
-				if (!GLUTHandleSMPTECtoSRGB.idx) GLUTHandleSMPTECtoSRGB = BGFX_INVALID_HANDLE;
-			}
-			break;
-		case INDEX_LUT_EBU_TO_SRGB:
-			if (!bgfx::isValid(GLUTHandleEBUtoSRGB)){
-				sprintf(fullpath, "%s/shaders/glut_ebu_to_srgb.png", basedir);
-				GLUTHandleEBUtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
-				if (!GLUTHandleEBUtoSRGB.idx) GLUTHandleEBUtoSRGB = BGFX_INVALID_HANDLE;
-			}
-			break;
-		case INDEX_LUT_INVERSE_NTSCJ_TO_SRGB:
-			if (!bgfx::isValid(GLUTHandleInverseNTSCJtoSRGB)){
-				sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_srgb.png", basedir);
-				GLUTHandleInverseNTSCJtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
-				if (!GLUTHandleInverseNTSCJtoSRGB.idx) GLUTHandleInverseNTSCJtoSRGB = BGFX_INVALID_HANDLE;
-			}
-			break;
-		case INDEX_LUT_INVERSE_NTSCJ_TO_SMPTEC:
-			if (!bgfx::isValid(GLUTHandleInverseNTSCJtoSMPTEC)){
-				sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_smptec.png", basedir);
-				GLUTHandleInverseNTSCJtoSMPTEC = createTextureHandle(fullpath, &width, &height, &mipCount, false);
-				if (!GLUTHandleInverseNTSCJtoSMPTEC.idx) GLUTHandleInverseNTSCJtoSMPTEC = BGFX_INVALID_HANDLE;
-			}
-			break;
-		case INDEX_LUT_INVERSE_NTSCJ_TO_EBU:
-			if (!bgfx::isValid(GLUTHandleInverseNTSCJtoEBU)){
-				sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_ebu.png", basedir);
-				GLUTHandleInverseNTSCJtoEBU = createTextureHandle(fullpath, &width, &height, &mipCount, false);
-				if (!GLUTHandleInverseNTSCJtoEBU.idx) GLUTHandleInverseNTSCJtoEBU = BGFX_INVALID_HANDLE;
-			}
-			break;
-		default:
-			ffnx_error("LoadGamutLUT: called with invalid index: %i\n", whichLUT);
-			break;
-	}
-	return;
+  switch (whichLUT){
+    case INDEX_LUT_NTSCJ_TO_SRGB:
+      if (!bgfx::isValid(GLUTHandleNTSCJtoSRGB)){
+        sprintf(fullpath, "%s/shaders/glut_ntscj_to_srgb.png", basedir);
+        GLUTHandleNTSCJtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
+        if (!GLUTHandleNTSCJtoSRGB.idx) GLUTHandleNTSCJtoSRGB = BGFX_INVALID_HANDLE;
+      }
+      break;
+    case INDEX_LUT_SMPTEC_TO_SRGB:
+      if (!bgfx::isValid(GLUTHandleSMPTECtoSRGB)){
+        sprintf(fullpath, "%s/shaders/glut_smptec_to_srgb.png", basedir);
+        GLUTHandleSMPTECtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
+        if (!GLUTHandleSMPTECtoSRGB.idx) GLUTHandleSMPTECtoSRGB = BGFX_INVALID_HANDLE;
+      }
+      break;
+    case INDEX_LUT_EBU_TO_SRGB:
+      if (!bgfx::isValid(GLUTHandleEBUtoSRGB)){
+        sprintf(fullpath, "%s/shaders/glut_ebu_to_srgb.png", basedir);
+        GLUTHandleEBUtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
+        if (!GLUTHandleEBUtoSRGB.idx) GLUTHandleEBUtoSRGB = BGFX_INVALID_HANDLE;
+      }
+      break;
+    case INDEX_LUT_INVERSE_NTSCJ_TO_SRGB:
+      if (!bgfx::isValid(GLUTHandleInverseNTSCJtoSRGB)){
+        sprintf(fullpath, "%s/shaders/glut_inverse_ntscj_to_srgb.png", basedir);
+        GLUTHandleInverseNTSCJtoSRGB = createTextureHandle(fullpath, &width, &height, &mipCount, false);
+        if (!GLUTHandleInverseNTSCJtoSRGB.idx) GLUTHandleInverseNTSCJtoSRGB = BGFX_INVALID_HANDLE;
+      }
+      break;
+    default:
+      ffnx_error("LoadGamutLUT: called with invalid index: %i\n", whichLUT);
+      break;
+  }
+  return;
 }
 
 void Renderer::shutdown()

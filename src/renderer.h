@@ -173,17 +173,17 @@ namespace RendererTextureSlot {
         TEX_IBL_DIFF,
         TEX_BRDF,
         TEX_G_LUT,
+        TEX_M_LUT,
+        TEX_B_LUT,
         COUNT
     };
 };
 
 enum GamutLUTIndexType{
-	INDEX_LUT_NTSCJ_TO_SRGB,
-	INDEX_LUT_SMPTEC_TO_SRGB,
-	INDEX_LUT_EBU_TO_SRGB,
-	INDEX_LUT_INVERSE_NTSCJ_TO_SRGB,
-	INDEX_LUT_INVERSE_NTSCJ_TO_SMPTEC,
-	INDEX_LUT_INVERSE_NTSCJ_TO_EBU
+    INDEX_LUT_NTSCJ_TO_SRGB,
+    INDEX_LUT_SMPTEC_TO_SRGB,
+    INDEX_LUT_EBU_TO_SRGB,
+    INDEX_LUT_INVERSE_NTSCJ_TO_SRGB
 };
 
 static void RendererReleaseImageContainer(void* _ptr, void* _userData)
@@ -372,8 +372,6 @@ private:
     bgfx::TextureHandle GLUTHandleSMPTECtoSRGB = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle GLUTHandleEBUtoSRGB = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle GLUTHandleInverseNTSCJtoSRGB = BGFX_INVALID_HANDLE;
-    bgfx::TextureHandle GLUTHandleInverseNTSCJtoSMPTEC = BGFX_INVALID_HANDLE;
-    bgfx::TextureHandle GLUTHandleInverseNTSCJtoEBU = BGFX_INVALID_HANDLE;
 
     bgfx::VertexLayout vertexLayout;
 
@@ -443,7 +441,7 @@ public:
     void prepareDiffuseIbl(char* fullpath = nullptr);
     void prepareEnvBrdf();
     void prepareGamutLUTs();
-	void LoadGamutLUT(GamutLUTIndexType whichLUT);
+    void LoadGamutLUT(GamutLUTIndexType whichLUT);
     void shutdown();
 
     void clearShadowMap();

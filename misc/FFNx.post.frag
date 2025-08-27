@@ -43,29 +43,26 @@ void main()
 		// back to linear for gamut conversion and PQ gamma curve
 		if (isOverallNTSCJColorGamut){
 			color.rgb = CRTSimulation(color.rgb); // CRT gamma-space in, linear out
-		}
-		else {
-			color.rgb = toLinearBT1886Appx1Fast(color.rgb);
-		}
-
-		// TODO: If/when a full 10-bit pathway is available for 10-bit FMVs, don't dither those
-		ivec2 dimensions = textureSize(tex_0, 0);
-		color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 2160.0);
-		if (isOverallNTSCJColorGamut){
 			color.rgb = convertGamut_NTSCJtoREC2020(color.rgb);
 		}
 		else {
+			color.rgb = toLinear(color.rgb);
 			color.rgb = convertGamut_SRGBtoREC2020(color.rgb);
 		}
 		color.rgb = ApplyREC2084Curve(color.rgb, monitorNits);
-	}
-	else if (isOverallNTSCJColorGamut){
-		color.rgb = GamutLUT(color.rgb, true, true, false); // CRT gamma-space in, linear out; LUT contains sRGB gamma-space data, but LUT function will linearize it while interpolating
-		// dither after the LUT operation
+		// dither because we increased bit depth
+		// dither in gamma space so dither step size corresponds to quantization step size
+		// TODO: If/when a full 10-bit pathway is available for 10-bit FMVs, don't dither those
 		ivec2 dimensions = textureSize(tex_0, 0);
 		color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 2160.0);
-		color.rgb = toGamma(color.rgb);
 	}
+	else if (isOverallNTSCJColorGamut){
+		color.rgb = GamutLUT(color.rgb);
+		color.rgb = toGamma(color.rgb);
+		ivec2 dimensions = textureSize(tex_0, 0);
+		color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 2160.0);
+	}
+	// If not HDR mode nor NTSC-J mode, we should already be in gamma-space sRGG.
 
 	gl_FragColor = color;
 }

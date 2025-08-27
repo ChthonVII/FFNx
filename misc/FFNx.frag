@@ -104,30 +104,15 @@ uniform vec4 gameScriptedLightColor;
 
 void main()
 {
-    // This stanza applies to solid colors. (For instance, the battle mode character selection triangles in FF7.)
-    // color will get clobbered later if there's a texture.
+    // This stanza pertains to (1) drawing solid colors, or (2) a modifier that's multiplied with a texture.
+    // It gets clobbered if it's a movie.
     vec4 color = v_color0;
-    // In this default shader, lighting is applied in gamma space so that it does better match the original lighting
-    // Also do it BEFORE linearization/gamut conversion
-    if (gameLightingMode == GAME_LIGHTING_PER_PIXEL)
-    {
-        vec3 normal = normalize(v_normal0);
-        vec3 worldNormal = mul(invViewMatrix, vec4(normal, 0)).xyz;
-        float dotLight1 = saturate(dot(worldNormal, gameLightDir1.xyz));
-        float dotLight2 = saturate(dot(worldNormal, gameLightDir2.xyz));
-        float dotLight3 = saturate(dot(worldNormal, gameLightDir3.xyz));
-        vec3 light1Ambient = gameLightColor1.rgb * dotLight1 * dotLight1;
-        vec3 light2Ambient = gameLightColor2.rgb * dotLight2 * dotLight2;
-        vec3 light3Ambient = gameLightColor3.rgb * dotLight3 * dotLight3;
-        vec3 lightAmbient = gameScriptedLightColor.rgb * (gameGlobalLightColor.rgb + light1Ambient + light2Ambient + light3Ambient);
-        color.rgb *= gameGlobalLightColor.w * lightAmbient;
-    }
-    // Now linearize, possibly with gamut conversion
-    color.rgb = toLinearSRGBSomehow(color.srgb, isOverallSRGBColorGamut);
-    // TODO: do we really want to linearize this when modulateAlpha is true?
+    //color.rgb = toLinearSRGBSomehow(color.rgb, isOverallNTSCJColorGamut);
+    color.rgb = toLinearBT1886Appx1Fast(color.rgb);
 
     if (isTexture)
     {
+        // This stanza pertains to movies
         if (isYUV)
         {
             vec3 yuv = vec3(
@@ -178,7 +163,16 @@ void main()
 
             // Use a different inverse gamma function depending on the FMV's metadata
             if (isCRTGamma){
-                color.rgb = toLinearBT1886Appx1Fast(color.rgb);
+                if (isNTSCJColorGamut)
+                {
+                    // "Color correction" simulation, BT1886 Appendix 1 linearization, gamut conversion, chromatic adaptation, and gamut compression rolled into a LUT
+                    // end result is linear RGB in sRGB gamut
+                    color.rgb = GamutLUT(color.rgb);
+                }
+                else
+                {
+                  color.rgb = toLinearBT1886Appx1Fast(color.rgb);
+                }
             }
             else if (is2pt2Gamma){
                 color.rgb = toLinear2pt2(color.rgb);
@@ -193,41 +187,20 @@ void main()
                 color.rgb = toLinear(color.rgb);
             }
 
-            // Convert gamut to BT709/SRGB or NTSC-J, depending on what we're going to do in post.
-            // We need to do this here, because we may draw things on top of the video, and so we need to match the gamut of the things we're going to draw.
-            // This approach has the unfortunate drawback of resulting in two gamut conversions for some inputs.
-            // But I see no alternative.
-            if (isOverallNTSCJColorGamut){
-                // do nothing for NTSC-J
-                // for other gamuts, backwards convert so that final NTSCJ-to-sRGB conversion will be a round trip
-                if ((isSRGBColorGamut) || (isSMPTECColorGamut) || (isEBUColorGamut)){
-                    color.rgb = GamutLUT(color.rgb, false, false, true); // linear in, linear out; LUT contains gamma-space data, but LUT function will linearize it while interpolating
-                    // dither after the LUT operation
-                    ivec2 dimensions = textureSize(tex_0, 0);
-                    color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 4320.0);
-                }
-                // Note: Bring back matrix-based conversions for HDR *if* we can find a way to left potentially out-of-bounds values linger until post processing.
+            // We need to get everything into linear RGB in sRGB gamut
+            //    no change needed for isSRGBColorGamut (BT709 uses same gamut as sRGB)
+            //    no change needed for isNTSCJColorGamut because it was handled above
+            if ((isSMPTECColorGamut) || (isEBUColorGamut))
+            {
+                // Gamut conversion only. Linear in, linear out; LUT contains gamma-space data, but LUT function will linearize it while interpolating
+                color.rgb = MovieGamutLUT(color.rgb);
             }
-            // overall sRGB
-            else {
-                // do nothing for sRGB
-                // take NTSC-J back to gamma-space, then full-on conversion
-                // straight linear-to-linear conversion for SMPTE-C and EBU
-                if ((isNTSCJColorGamut) || (isSMPTECColorGamut) || (isEBUColorGamut)){
-                    if (isNTSCJColorGamut){
-                      // go back to gamma space
-                      color.rgb = toGammaBT1886Appx1Fast(color.rgb);
-                    }
-                    color.rgb = GamutLUT(color.rgb, isNTSCJColorGamut, true, false); // variable in, linear out; LUT contains sRGB gamma-space data, but LUT function will linearize it while interpolating
-                    // dither after the LUT operation
-                    ivec2 dimensions = textureSize(tex_0, 0);
-                    color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 4320.0);
-                }
-                // Note: Bring back matrix-based conversions for HDR *if* we can find a way to left potentially out-of-bounds values linger until post processing.
-            }
+            // TODO: It would be nice to go directly to rec2020 if HDR mode is enabled...
+            // But that would require building a full rec2020 code path.
 
             color.a = 1.0;
         }
+        // This stanza pertains to all textures that aren't movies
         else
         {
             vec4 texture_color = texture2D(tex_0, v_texcoord0.xy);
@@ -274,33 +247,26 @@ void main()
                 }
             }
 
-
+            // check for some discard conditions
+            if (isMovie) texture_color.a = 1.0;
+            if (texture_color.a == 0.0) discard;
             if (isFBTexture)
             {
                 if(all(equal(texture_color.rgb,vec3_splat(0.0)))) discard;
-
-                // This was previously in sRGB gamma space, so linearize again.
-                texture_color.rgb = toLinear(texture_color.rgb);
-
-            }
-            else
-            {
-                // This texture is in gamma space
             }
 
-            // Use CRT gamma for all textures (no longer using BGFX's built-in sRGB linearization)
-            texture_color.rgb = toLinearBT1886Appx1Fast(texture_color.rgb);
+            // linearize, possibly with gamut conversion
+            texture_color.rgb = toLinearSRGBSomehow(texture_color.rgb, isOverallNTSCJColorGamut);
+            //texture_color.rgb = toLinearBT1886Appx1Fast(texture_color.rgb);
 
-            if (isMovie) texture_color.a = 1.0;
-
-            if (texture_color.a == 0.0) discard;
-
+            // multiply by v_color0
             if (modulateAlpha) color *= texture_color;
             else
             {
                 color.rgb *= texture_color.rgb;
                 color.a = texture_color.a;
             }
+
         }
     }
 
@@ -308,11 +274,12 @@ void main()
 
     if (!(isTLVertex) && isFogEnabled) color.rgb = ApplyWorldFog(color.rgb, v_position0.xyz);
 
-    // return to gamma space so we can do alpha blending the same way FF7/8 did.
+    // return to sRGB gamma space so we can do alpha blending the same way FF7/8 did.
+    //color.rgb = toGammaSomehow(color.rgb, isOverallNTSCJColorGamut);
     color.rgb = toGammaBT1886Appx1Fast(color.rgb);
 
     // In this default shader, lighting is applied in gamma space so that it does better match the original lighting
-    if (gameLightingMode == GAME_LIGHTING_PER_PIXEL)
+    if ((gameLightingMode == GAME_LIGHTING_PER_PIXEL))
     {
         vec3 normal = normalize(v_normal0);
         vec3 worldNormal = mul(invViewMatrix, vec4(normal, 0)).xyz;
@@ -326,5 +293,13 @@ void main()
         color.rgb *= gameGlobalLightColor.w * lightAmbient;
     }
     
+    // if we did a movie gamut conversion, and won't dither later, then dither now
+    // do this in gamma space so that dither step size corresponds to quantization step size
+    if (isTexture && !(isOverallNTSCJColorGamut) && isYUV && !(isSRGBColorGamut))
+    {
+      ivec2 dimensions = textureSize(tex_0, 0);
+      color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 4320.0);
+    }
+
     gl_FragColor = color;
 }

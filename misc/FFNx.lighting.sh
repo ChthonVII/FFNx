@@ -28,11 +28,15 @@ uniform vec4 lightData;
 uniform vec4 ambientLightData;
 uniform vec4 TimeColor;
 uniform vec4 TimeData;
+uniform vec4 FSMovieFlags;
 
 #define isTimeEnabled TimeData.x > 0.0
 #define isTimeFilterEnabled TimeData.x > 0.0 && TimeData.y > 0.0
 
 #define INV_PI 0.31831
+
+#define isOverallSRGBColorGamut abs(FSMovieFlags.w - 0.0) < 0.00001
+#define isOverallNTSCJColorGamut abs(FSMovieFlags.w - 1.0) < 0.00001
 
 // Normal Mapping Without Precomputed Tangents
 // http://www.thetenthplanet.de/archives/1180
@@ -134,6 +138,7 @@ vec3 calcLuminance(vec3 albedo, vec3 viewSpacePosition, vec3 viewDir, vec3 norma
     // Light
     float lightIntensity = lightData.w;
     vec3 lightColor = toLinearBT1886Appx1Fast(lightData.rgb);
+    //vec3 lightColor = toLinearSRGBSomehow(lightData.rgb, isOverallNTSCJColorGamut);
     if(isTimeEnabled)
     {
         lightColor *= TimeColor.rgb;
@@ -169,6 +174,7 @@ vec3 CalcIblIndirectLuminance(vec3 albedo, vec3 specularIbl, vec3 diffuseIbl, ve
     vec3 diffuse = diffuseIbl * albedo;
     vec3 indirectDiffuse = (1.0 - metallic) * diffuse;
 
+    //vec3 ambientLightColor = toLinearSRGBSomehow(ambientLightData.rgb, isOverallNTSCJColorGamut);
     vec3 ambientLightColor = toLinearBT1886Appx1Fast(ambientLightData.rgb);
     float ambientLightIntensity = ambientLightData.w;
 
@@ -178,6 +184,7 @@ vec3 CalcIblIndirectLuminance(vec3 albedo, vec3 specularIbl, vec3 diffuseIbl, ve
 vec3 CalcConstIndirectLuminance(vec3 albedo)
 {
     // Ambient
+    //vec3 ambientLightColor = toLinearSRGBSomehow(ambientLightData.rgb, isOverallNTSCJColorGamut);
     vec3 ambientLightColor = toLinearBT1886Appx1Fast(ambientLightData.rgb);
     if(isTimeEnabled)
     {
