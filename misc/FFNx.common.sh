@@ -495,6 +495,7 @@ vec3 toLinearSRGBSomehow(vec3 rgb_input, bool ntscjmode)
 	vec3 outcolor = rgb_input;
 	if (ntscjmode)
 	{
+		outcolor = CRTSimulation(outcolor);
 		/*
 		if ((outcolor.r == outcolor.g) && (outcolor.r == outcolor.b)){
 			outcolor.rgb = toLinearBT1886Appx1Fast(outcolor);
@@ -504,6 +505,7 @@ vec3 toLinearSRGBSomehow(vec3 rgb_input, bool ntscjmode)
 		}
 		*/
 
+		/*
 		outcolor.rgb = GamutLUT(saturate(outcolor));
 		if(all(equal(outcolor.rgb,vec3_splat(0.0)))){
 			outcolor = toLinearBT1886Appx1Fast(rgb_input);
@@ -511,10 +513,17 @@ vec3 toLinearSRGBSomehow(vec3 rgb_input, bool ntscjmode)
 			if (outcolor.r + outcolor.g + outcolor.b > 0.3){
 				outcolor = vec3(1.0, 0.0, 0.0);
 			}
+			if (any(greaterThan(rgb_input, vec3_splat(1.0)))){
+        outcolor = vec3(0.0, 0.0, 1.0);
+			}
+			else if (any(lessThan(rgb_input, vec3_splat(0.0)))){
+        outcolor = vec3(0.0, 1.0, 0.0);
+			}
 		}
 		//else {
 		//	outcolor = outcolor * vec3(0.5, 0.5, 1.0);
 		//}
+		*/
 
 	}
 	else
@@ -532,11 +541,14 @@ vec3 toGammaSomehow(vec3 rgb_input, bool ntscjmode)
 	vec3 outcolor = rgb_input;
 	if (ntscjmode)
 	{
-		outcolor.rgb = BackwardsGamutLUT(outcolor);
+		outcolor = InverseCRTSimulation(outcolor);
+		/*
+    outcolor.rgb = BackwardsGamutLUT(outcolor);
 		if(all(equal(outcolor.rgb,vec3_splat(0.0)))){
 			outcolor = toGammaBT1886Appx1Fast(rgb_input);
 			//outcolor = rgb_input;
 		}
+		*/
 	}
 	else
 	{

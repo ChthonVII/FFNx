@@ -184,7 +184,12 @@ void main()
                 {
                     // "Color correction" simulation, BT1886 Appendix 1 linearization, gamut conversion, chromatic adaptation, and gamut compression rolled into a LUT
                     // end result is linear RGB in sRGB gamut
-                    color.rgb = GamutLUT(color.rgb);
+                    if (isOverallNTSCJColorGamut){
+                        color.rgb = CRTSimulation(color.rgb);
+                    }
+                    else{
+                      color.rgb = GamutLUT(color.rgb);
+                    }
                 }
                 else
                 {
@@ -299,7 +304,9 @@ void main()
             if (texture_color.a == 0.0) discard;
 
             texture_color.rgb = toLinearSRGBSomehow(texture_color.rgb, isOverallNTSCJColorGamut);
+            //texture_color.rgb = CRTSimulation(texture_color.rgb);
             //texture_color.rgb = toLinearBT1886Appx1Fast(texture_color.rgb);
+            //texture_color.rgb = vec3_splat(0.75);
 
             if (modulateAlpha) color *= texture_color;
             else
@@ -424,24 +431,26 @@ void main()
         float dotLight2 = saturate(dot(worldNormal, gameLightDir2.xyz));
         float dotLight3 = saturate(dot(worldNormal, gameLightDir3.xyz));
 
-        /*
+
         vec3 light1Ambient = toLinearSRGBSomehow(gameLightColor1.rgb, isOverallNTSCJColorGamut) * dotLight1 * dotLight1;
         vec3 light2Ambient = toLinearSRGBSomehow(gameLightColor2.rgb, isOverallNTSCJColorGamut) * dotLight2 * dotLight2;
         vec3 light3Ambient = toLinearSRGBSomehow(gameLightColor3.rgb, isOverallNTSCJColorGamut) * dotLight3 * dotLight3;
         vec3 lightAmbient = toLinearSRGBSomehow(gameScriptedLightColor.rgb, isOverallNTSCJColorGamut) * (toLinearSRGBSomehow(gameGlobalLightColor.rgb, isOverallNTSCJColorGamut) + light1Ambient + light2Ambient + light3Ambient);
-        */
 
+
+        /*
         vec3 light1Ambient = toLinearBT1886Appx1Fast(gameLightColor1.rgb) * dotLight1 * dotLight1;
         vec3 light2Ambient = toLinearBT1886Appx1Fast(gameLightColor2.rgb) * dotLight2 * dotLight2;
         vec3 light3Ambient = toLinearBT1886Appx1Fast(gameLightColor3.rgb) * dotLight3 * dotLight3;
         vec3 lightAmbient = toLinearBT1886Appx1Fast(gameScriptedLightColor.rgb) * (toLinearBT1886Appx1Fast(gameGlobalLightColor.rgb) + light1Ambient + light2Ambient + light3Ambient);
-
+        */
         gl_FragColor.rgb *= gameGlobalLightColor.w * lightAmbient;
     }
 
     // return to sRGB gamma space so we can do alpha blending the same way FF7/8 did.
-    //gl_FragColor.rgb = toGammaSomehow(gl_FragColor.rgb, isOverallNTSCJColorGamut);
-    gl_FragColor.rgb = toGammaBT1886Appx1Fast(gl_FragColor.rgb);
+    gl_FragColor.rgb = toGammaSomehow(gl_FragColor.rgb, isOverallNTSCJColorGamut);
+    //gl_FragColor.rgb = InverseCRTSimulation(gl_FragColor.rgb);
+    //gl_FragColor.rgb = toGammaBT1886Appx1Fast(gl_FragColor.rgb);
 
 
     // if we did a movie gamut conversion, and won't dither later, then dither now

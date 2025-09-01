@@ -107,8 +107,8 @@ void main()
     // This stanza pertains to (1) drawing solid colors, or (2) a modifier that's multiplied with a texture.
     // It gets clobbered if it's a movie.
     vec4 color = v_color0;
-    //color.rgb = toLinearSRGBSomehow(color.rgb, isOverallNTSCJColorGamut);
-    color.rgb = toLinearBT1886Appx1Fast(color.rgb);
+    color.rgb = toLinearSRGBSomehow(color.rgb, isOverallNTSCJColorGamut);
+    //color.rgb = toLinearBT1886Appx1Fast(color.rgb);
 
     if (isTexture)
     {
@@ -167,7 +167,13 @@ void main()
                 {
                     // "Color correction" simulation, BT1886 Appendix 1 linearization, gamut conversion, chromatic adaptation, and gamut compression rolled into a LUT
                     // end result is linear RGB in sRGB gamut
-                    color.rgb = GamutLUT(color.rgb);
+                    //color.rgb = GamutLUT(color.rgb);
+                    if (isOverallNTSCJColorGamut){
+                        color.rgb = CRTSimulation(color.rgb);
+                    }
+                    else{
+                      color.rgb = GamutLUT(color.rgb);
+                    }
                 }
                 else
                 {
@@ -275,8 +281,8 @@ void main()
     if (!(isTLVertex) && isFogEnabled) color.rgb = ApplyWorldFog(color.rgb, v_position0.xyz);
 
     // return to sRGB gamma space so we can do alpha blending the same way FF7/8 did.
-    //color.rgb = toGammaSomehow(color.rgb, isOverallNTSCJColorGamut);
-    color.rgb = toGammaBT1886Appx1Fast(color.rgb);
+    color.rgb = toGammaSomehow(color.rgb, isOverallNTSCJColorGamut);
+    //color.rgb = toGammaBT1886Appx1Fast(color.rgb);
 
     // In this default shader, lighting is applied in gamma space so that it does better match the original lighting
     if ((gameLightingMode == GAME_LIGHTING_PER_PIXEL))

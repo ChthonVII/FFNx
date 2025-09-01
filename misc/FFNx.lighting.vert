@@ -63,8 +63,14 @@ void main()
     vec4 color = a_color0;
     vec2 coords = a_texcoord0;
 
-    //color.rgb = toLinearSRGBSomehow(color.bgr, isOverallNTSCJColorGamut);
-    color.rgb = toLinearBT1886Appx1Fast(color.bgr);
+    color.rgb = toLinearSRGBSomehow(color.bgr, isOverallNTSCJColorGamut);
+    //if (isNotTexture){
+    //  color.rgb = toLinearSRGBSomehow(color.bgr, isOverallNTSCJColorGamut);
+    //}
+    //else{
+    //  color.rgb = toLinearBT1886Appx1Fast(color.bgr);
+    //}
+    //color.rgb = vec3_splat(0.75);
 
     if (isTLVertex)
     {
@@ -91,18 +97,19 @@ void main()
             float dotLight1 = saturate(dot(worldNormal, gameLightDir1.xyz));
             float dotLight2 = saturate(dot(worldNormal, gameLightDir2.xyz));
             float dotLight3 = saturate(dot(worldNormal, gameLightDir3.xyz));
-            /*
+
             vec3 light1Ambient = toLinearSRGBSomehow(gameLightColor1.rgb, isOverallNTSCJColorGamut) * dotLight1 * dotLight1;
             vec3 light2Ambient = toLinearSRGBSomehow(gameLightColor2.rgb, isOverallNTSCJColorGamut) * dotLight2 * dotLight2;
             vec3 light3Ambient = toLinearSRGBSomehow(gameLightColor3.rgb, isOverallNTSCJColorGamut) * dotLight3 * dotLight3;
             vec3 lightAmbient = toLinearSRGBSomehow(gameScriptedLightColor.rgb, isOverallNTSCJColorGamut) * (toLinearSRGBSomehow(gameGlobalLightColor.rgb, isOverallNTSCJColorGamut) + light1Ambient + light2Ambient + light3Ambient);
-            */
 
+
+            /*
             vec3 light1Ambient = toLinearBT1886Appx1Fast(gameLightColor1.rgb) * dotLight1 * dotLight1;
             vec3 light2Ambient = toLinearBT1886Appx1Fast(gameLightColor2.rgb) * dotLight2 * dotLight2;
             vec3 light3Ambient = toLinearBT1886Appx1Fast(gameLightColor3.rgb) * dotLight3 * dotLight3;
             vec3 lightAmbient = toLinearBT1886Appx1Fast(gameScriptedLightColor.rgb) * (toLinearBT1886Appx1Fast(gameGlobalLightColor.rgb) + light1Ambient + light2Ambient + light3Ambient);
-
+            */
 
             color.rgb *= gameGlobalLightColor.w * lightAmbient;
         }

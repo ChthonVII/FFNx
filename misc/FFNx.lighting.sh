@@ -137,8 +137,8 @@ vec3 calcLuminance(vec3 albedo, vec3 viewSpacePosition, vec3 viewDir, vec3 norma
 
     // Light
     float lightIntensity = lightData.w;
-    vec3 lightColor = toLinearBT1886Appx1Fast(lightData.rgb);
-    //vec3 lightColor = toLinearSRGBSomehow(lightData.rgb, isOverallNTSCJColorGamut);
+    //vec3 lightColor = toLinearBT1886Appx1Fast(lightData.rgb);
+    vec3 lightColor = toLinearSRGBSomehow(lightData.rgb, isOverallNTSCJColorGamut);
     if(isTimeEnabled)
     {
         lightColor *= TimeColor.rgb;
@@ -174,8 +174,8 @@ vec3 CalcIblIndirectLuminance(vec3 albedo, vec3 specularIbl, vec3 diffuseIbl, ve
     vec3 diffuse = diffuseIbl * albedo;
     vec3 indirectDiffuse = (1.0 - metallic) * diffuse;
 
-    //vec3 ambientLightColor = toLinearSRGBSomehow(ambientLightData.rgb, isOverallNTSCJColorGamut);
-    vec3 ambientLightColor = toLinearBT1886Appx1Fast(ambientLightData.rgb);
+    vec3 ambientLightColor = toLinearSRGBSomehow(ambientLightData.rgb, isOverallNTSCJColorGamut);
+    //vec3 ambientLightColor = toLinearBT1886Appx1Fast(ambientLightData.rgb);
     float ambientLightIntensity = ambientLightData.w;
 
     return (indirectDiffuse + indirectSpecular) * ambientLightColor * ambientLightIntensity * ao;
@@ -184,8 +184,8 @@ vec3 CalcIblIndirectLuminance(vec3 albedo, vec3 specularIbl, vec3 diffuseIbl, ve
 vec3 CalcConstIndirectLuminance(vec3 albedo)
 {
     // Ambient
-    //vec3 ambientLightColor = toLinearSRGBSomehow(ambientLightData.rgb, isOverallNTSCJColorGamut);
-    vec3 ambientLightColor = toLinearBT1886Appx1Fast(ambientLightData.rgb);
+    vec3 ambientLightColor = toLinearSRGBSomehow(ambientLightData.rgb, isOverallNTSCJColorGamut);
+    //vec3 ambientLightColor = toLinearBT1886Appx1Fast(ambientLightData.rgb);
     if(isTimeEnabled)
     {
         ambientLightColor *= TimeColor.rgb;
