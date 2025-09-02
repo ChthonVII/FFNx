@@ -6,7 +6,10 @@ Secondarily, it can also be used as a guide if you wish to make adjustments to t
 (Be aware, though, that changing this behavior will require recompiling FFNx and/or its shaders.)
 
 In a nutshell:
- - FFNx uses the EOTF function from BT1886 Appendix 1 as the gamma function for everything, except videos specify a gamma function in their metadata and FF8 Steam videos. This function approximates the gamma behavior of a CRT television/computer monitor.
+ - FFNx uses the EOTF function from BT1886 Appendix 1 as the gamma function in several situations. This function approximates the gamma behavior of a CRT television/computer monitor.
+      - FFNx always uses the BT1886 Appendix 1 function for videos that don't specify a gamma function in their metadata, except for FF8 Steam videos.
+      - If NTSC-J mode is enabled, FFNx uses the EOTF function from BT1886 Appendix 1 as the gamma function for *everything*, except videos that specify a gamma function in their metadata and FF8 Steam videos.
+      - If NTSC-J mode is disabled, FFNx uses the sRGB gamma function generally, except for movies as explained above.
  - If NTSC-J mode is enabled, FFNx simulates the "color correction" behavior, phosphor color gamut, and whitepoint of a mid-90s Japanese-model professional-grade Sony Trinitron CRT television, then converts that to sRGB (or to rec2020 if HDR mode is enabled).
  - If NTSC-J mode is disabled, colors are displayed as-is, without any adjustments to account for the differences between 90s-era displays and modern displays.
 
@@ -23,7 +26,7 @@ The choice of which particular CRT television to emulate -- a mid-90s Japanese-m
 
 ## Gamma
 
-FFNx uses the EOTF function from BT1886 Appendix 1 [note 2] as the gamma function for everything, except videos specify a gamma function in their metadata and FF8 Steam videos (which are assumed to be BT709). (Note that, quite confusingly, BT1886 contains both an "Annex 1" and an "Appendix 1." The Annex 1 function is pretty crummy. The Appendix 1 function is quite good.)
+If NTSC-J mode is enabled, FFNx uses the EOTF function from BT1886 Appendix 1 [note 2] as the gamma function for everything, except videos specify a gamma function in their metadata and FF8 Steam videos (which are assumed to be BT709). Regardless of NTSC-J mode, FFNx always uses this EOTF function for videos tha tdon't specify a gamma function in their metadata, except for FF8 Steam videos  (Note that, quite confusingly, BT1886 contains both an "Annex 1" and an "Appendix 1." The Annex 1 function is pretty crummy. The Appendix 1 function is quite good.)
 
 The parameters/constants for the BT1886 Appendix 1 function are found at the top of `misc/FFNx.common.sh`.
 - `crtBlackLevel` times 100 is the black level of the CRT television/computer monitor in cd/m^2. (Corresponds to the "brightness" knob.)
@@ -106,7 +109,7 @@ gamutthingy -c 0x123456  --source-primaries srgb_spec --source-whitepoint D65 --
 
 ## sRGB to NTSC-J Gamut Conversion
 
-This conversion is only used in NTSC-J mode for movies with metadata that specifies BT709 (which is the same as sRGB, except the gamma function) or FF8 Steam movies, which are assumed to be BT709. This conversion is the inverse of the global "NTSC-J to sRGB" conversion that will be performed later. Together the two conversions constitute a round trip, displaying the video with BT709 colors. (We cannot simply shut off global "NTSC-J to sRGB" conversion while these movies are playing because the game engine sometimes draws things on top of movies that need that conversion.)
+This conversion is only used in NTSC-J mode for movies with metadata that specifies BT709 (which is the same as sRGB, except the gamma function) or FF8 Steam movies, which are assumed to be BT709. This conversion is the inverse of the global "NTSC-J to sRGB" conversion that will be performed later. Together the two conversions constitute a round trip, displaying the video with BT709 colors. (We cannot simply shut off global "NTSC-J to sRGB" conversion while these movies are playing because the game engine sometimes draws things on top of movies that need that conversion. Instead we need to get the movies into the same colorspace as the things tht will be drawn over it.)
 
 This conversion is done using the LUT `misc/glut_inverse_ntscj_to_srgb.png`. The command used to generate this LUT was:
 ```
@@ -114,33 +117,33 @@ gamutthingy --lutgen true --lutsize 64 --lutmode normal --crtemu front --crtdemo
 ```
 The indices to this LUT are in sRGB space linear RGB.
 
-This LUT's values are stored in NTSC-J CRT gamma-space R'G'B' without color correction, and must be linearized before interpolation. (Ideally, they'd be color corrected too, but see below.)
+This LUT's values are stored in NTSC-J CRT gamma-space R'G'B' without color correction, and must be linearized before interpolation.
 
 ## SMPTE-C to NTSC-J Gamut Conversion
 
-This conversion is only used in NTSC-J mode for movies with metadata that specifies SMPTE-C gamut. This conversion is the inverse of a "NTSC-J to SMPTE-C" conversion. Together with the global "NTSC-J to sRGB" conversion that will be performed later, the two conversions constitute a two-hop trip, ultimately converting SMPTE-C to sRGB. (We cannot use a simple one-hop conversion because the game engine sometimes draws things on top of movies that need that "NTSC-J to sRGB" conversion.)
+This conversion is only used in NTSC-J mode for movies with metadata that specifies SMPTE-C gamut. This conversion is the inverse of a "NTSC-J to SMPTE-C" conversion. Together with the global "NTSC-J to sRGB" conversion that will be performed later, the two conversions constitute a two-hop trip, ultimately converting SMPTE-C to sRGB. (We cannot use a simple one-hop conversion because the game engine sometimes draws things on top of movies that need that "NTSC-J to sRGB" conversion. Instead we need to get the movies into the same colorspace as the things tht will be drawn over it.)
 
 This conversion is done using the LUT `misc/glut_inverse_ntscj_to_spmtec.png`. The command used to generate this LUT was:
 ```
-gamutthingy --lutgen true --lutsize 64 --lutmode normal --crtemu front --crtdemod CXA2060BS_JP --crtyuvconst 3digit --retroarchtextoutputfile infodump.txt --crtclamphighenable false --crtclamplowzerolight true --crtblack 0.0018 --crtwhite 1.5 --crt-saturation-knob 1.04 --source-primaries P22_trinitron_mixandmatch --source-whitepoint 9300K8mpcd --dest-primaries smptec_spec --dest-whitepoint D65 --adapt cat16 --spiral-carisma true --map-mode compress --gamut-mapping-algorithm vprc --gamma-out linear --backwards true --outfile glut_inverse_ntscj_to_spmtec.png
+gamutthingy --lutgen true --lutsize 64 --lutmode normal --crtemu front --crtdemod CXA2060BS_JP --crtyuvconst 3digit --retroarchtextoutputfile infodump.txt --crtclamphighenable false --crtclamplowzerolight true --crtblack 0.0018 --crtwhite 1.5 --crt-saturation-knob 1.04 --source-primaries P22_trinitron_mixandmatch --source-whitepoint 9300K8mpcd --dest-primaries smptec_spec --dest-whitepoint D65 --adapt cat16 --spiral-carisma true --map-mode compress --gamut-mapping-algorithm vprc --gamma-out linear --backwards true --outfile glut_inverse_ntscj_to_smptec.png
 ```
 
 The indices to this LUT are in SPMTE-C space linear RGB.
 
-This LUT's values are stored in NTSC-J CRT gamma-space R'G'B' without color correction, and must be linearized before interpolation. (Ideally, they'd be color corrected too, but see below.)
+This LUT's values are stored in NTSC-J CRT gamma-space R'G'B' without color correction, and must be linearized before interpolation.
 
 ## EBU to NTSC-J Gamut Conversion
 
-This conversion is only used in NTSC-J mode for movies with metadata that specifies EBU gamut. This conversion is the inverse of a "NTSC-J to EBU" conversion. Together with the global "NTSC-J to sRGB" conversion that will be performed later, the two conversions constitute a two-hop trip, ultimately converting EBU to sRGB. (We cannot use a simple one-hop conversion because the game engine sometimes draws things on top of movies that need that "NTSC-J to sRGB" conversion.)
+This conversion is only used in NTSC-J mode for movies with metadata that specifies EBU gamut. This conversion is the inverse of a "NTSC-J to EBU" conversion. Together with the global "NTSC-J to sRGB" conversion that will be performed later, the two conversions constitute a two-hop trip, ultimately converting EBU to sRGB. (We cannot use a simple one-hop conversion because the game engine sometimes draws things on top of movies that need that "NTSC-J to sRGB" conversion. Instead we need to get the movies into the same colorspace as the things tht will be drawn over it.)
 
 This conversion is done using the LUT `misc/glut_inverse_ntscj_to_ebu.png`. The command used to generate this LUT was:
 ```
-gamutthingy --lutgen true --lutsize 64 --lutmode normal --crtemu front --crtdemod CXA2060BS_JP --crtyuvconst 3digit --retroarchtextoutputfile infodump.txt --crtclamphighenable false --crtclamplowzerolight true --crtblack 0.0018 --crtwhite 1.5 --crt-saturation-knob 1.04 --source-primaries P22_trinitron_mixandmatch --source-whitepoint 9300K8mpcd --dest-primaries ebu_spec --dest-whitepoint D65 --adapt cat16 --spiral-carisma true --map-mode compress --gamut-mapping-algorithm vprc --gamma-out linear --backwards true --outfile glut_inverse_ntscj_to_spmtec.png
+gamutthingy --lutgen true --lutsize 64 --lutmode normal --crtemu front --crtdemod CXA2060BS_JP --crtyuvconst 3digit --retroarchtextoutputfile infodump.txt --crtclamphighenable false --crtclamplowzerolight true --crtblack 0.0018 --crtwhite 1.5 --crt-saturation-knob 1.04 --source-primaries P22_trinitron_mixandmatch --source-whitepoint 9300K8mpcd --dest-primaries ebu_spec --dest-whitepoint D65 --adapt cat16 --spiral-carisma true --map-mode compress --gamut-mapping-algorithm vprc --gamma-out linear --backwards true --outfile glut_inverse_ntscj_to_ebu.png
 ```
 
 The indices to this LUT are in EBU space linear RGB.
 
-This LUT's values are stored in NTSC-J CRT gamma-space R'G'B' without color correction, and must be linearized before interpolation. (Ideally, they'd be color corrected too, but see below.)
+This LUT's values are stored in NTSC-J CRT gamma-space R'G'B' without color correction, and must be linearized before interpolation.
 
 ## SMPTE-C to sRGB Gamut Conversion
 
@@ -168,24 +171,20 @@ The indices to this LUT are in EBU space linear RGB.
 
 This LUT's values are stored using sRGB gamma, and must be linearized before interpolation. (The LUT is stored using sRGB gamma so that more bandwidth is dedicated to colors where human vision is more sensitive.)
 
-## A Minor Shortcoming
+## Linear RGB Colorspaces
 
-FFNx's shader stack flips back and forth between gamma-space R'G'B' and linear RGB several times. Astute observers may have noticed that, when NTSC-J mode is enabled, these intermediate de/linearizations only use the BT1886 Appendix 1 function, and do not use the color correction simulation. "Isn't this wrong?" one might ask."Shouldn't the color correction be applied before every linearization and inverted after every delinearization?" Yes, it is wrong.
-
-Unfortunately, this is not readily fixable. Color correction simulation produces out-of-bounds outputs both below 0.0 and above 1.0. Other code, such as the lighting system, cannot handle such values. But clamping would render the color correction simulation non-invertible (in addition to causing clipping). It *might* be possible to rewrite the lighting system, etc. using a scaling scheme.
-
-Fortunately, it doesn't have much impact on the final result. So long as the gamma function is correct, the result should still be close to right. Usually the error shouldn't be much bigger than the quantization error involved in sending the image to the monitor.
+FFNx's shader stack flips back and forth between gamma-space R'G'B' and linear RGB, doing some operations, most notably advanced lighting, in linear RGB. When NTSC-J mode is disabled, linear sRGB is used. When NTSC-J mode is enabled, "CRT linear RGB" is used. That is, color correction simulation followed by linearization with the EOTF function from BT1886 Appendix 1. This is accompished by `CRTSimulation()`, and reversed by `InverseCRTSimulation()`, both from `misc/FFNx.common.sh`. Because CRT color correction produced out-of-bounds values that weren't clamped (see above), operations in "CRT linear RGB" need to correctly deal with inputs >1.0.
 
 ## Footnotes
 
 - [1] [Image](https://github-production-user-asset-6210df.s3.amazonaws.com/40120498/391341848-12925c41-58a7-4c79-8333-1341c9499133.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250802%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250802T035224Z&X-Amz-Expires=300&X-Amz-Signature=67752f1fb98e4bc0d942f916f5a68aaaaa126915a442b4a25edfe234470a1574&X-Amz-SignedHeaders=host) from "SNES (Super Famicom) Software Development Kit (SDK)" at [retroreversing.com](https://www.retroreversing.com/super-famicom-snes-sdk/).
 - [2] International Telecommunication Union. "Recommendation ITU-R BT.1886: Reference electro-optical transfer function for flat panel displays used in HDTV studio production." March, 2011. ([Link](https://www.itu.int/rec/R-REC-BT.1886-0-201103-I/en))
 - [3] Soneira, Raymond. "Display Technology Shoot-Out: Comparing CRT, LCD, Plasma and DLP Displays." 2005(?) ([Link](https://www.displaymate.com/ShootOut_Part_1.htm))
-- [4] Bohnsack, David L.; Diller, Lisa C.; Yeh, Tsaiyao; Jenness, James W.; and Troy, John B. "Characteristics of the Sony Multiscan 17se Trinitron color graphic display." Spatial Vision, Vol. 10, No. 4, pp. 345-51. 1997. ([Link](https://www.scholars.northwestern.edu/en/publications/characteristics-of-the-sony-multiscan-17se-trinitron-color-graphi))
-- [5] Parker, Norman W. "An Analysis of the Necessary Decoder Corrections for Color Receiver Operation with Non-Standard Receiver Primaries." *IEEE Transactions on Broadcast and Television Receivers*, Vol. BTR-12, No. 1, pp. 23—32. April 1966 ([Link](https://ieeexplore.ieee.org/document/4319950)); republished in  *IEEE Transactions on Consumer Electronics*, Vol. CE-28, No. 1, pp. 74-83. February 1982. ([Link](https://ieeexplore.ieee.org/document/4179914))
+- [4] Bohnsack, David L.; Diller, Lisa C.; Yeh, Tsaiyao; Jenness, James W.; and Troy, John B. "Characteristics of the Sony Multiscan 17se Trinitron color graphic display." *Spatial Vision*, Vol. 10, No. 4, pp. 345-51. 1997. ([Link](https://www.scholars.northwestern.edu/en/publications/characteristics-of-the-sony-multiscan-17se-trinitron-color-graphi))
+- [5] Parker, Norman W. "An Analysis of the Necessary Decoder Corrections for Color Receiver Operation with Non-Standard Receiver Primaries." *IEEE Transactions on Broadcast and Television Receivers*, Vol. BTR-12, No. 1, pp. 23-32. April 1966 ([Link](https://ieeexplore.ieee.org/document/4319950)); republished in  *IEEE Transactions on Consumer Electronics*, Vol. CE-28, No. 1, pp. 74-83. February 1982. ([Link](https://ieeexplore.ieee.org/document/4179914))
 - [6] CXA2060BS data sheet. ([Link](https://www.alldatasheet.com/datasheet-pdf/view/46749/SONY/CXA2060BS.html))
 - [7] Service Manual for PVM 14N and 20N series. ([Link](https://consolemods.org/wiki/images/0/05/Sony_SSM_PVM-20N6U_20N5U_14N6U_14N5U_Service_Manual.pdf))
-- [8] Impromptu text by Patchy68k ([Link](https://github.com/ChthonVII/gamutthingy/issues/1#issuecomment-2661096849))
+- [8] Impromptu test by Patchy68k ([Link](https://github.com/ChthonVII/gamutthingy/issues/1#issuecomment-2661096849))
 - [9] Sony PVM 20M2U measured by Keith Raney ([Link](https://github.com/danmons/colour_matrix_adaptations/blob/main/csv/inputs.csv))
 - [10] Has, Michael & Newman, Todd. "Color Management: Current Practice and The Adoption of a New Standard." *TAGA (Technical Association of Graphic Arts) Proceedings*, Vol. 2, pp. 748-771. 1995. ([Link](https://www.color.org/wpaper1.xalter))
 - [11] Yen, William; Shionoya, Shigeo; and Yamamoto, Hajime. "Phosphor Handbook Second Edition," sections 6.2.3 and 18.6.2. CRC Press, Boca Raton (2007).

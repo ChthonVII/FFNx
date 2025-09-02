@@ -13,6 +13,9 @@
 //    GNU General Public License for more details.                          //
 /****************************************************************************/
 
+// This shader is never used for 2D elements.
+// This shader is used for 3D elements when advanced lighting is enabled.
+
 $input a_position, a_color0, a_texcoord0, a_normal
 $output v_color0, v_texcoord0, v_position0, v_shadow0, v_normal0
 
@@ -59,18 +62,11 @@ uniform vec4 gameScriptedLightColor;
 
 void main()
 {
-	vec4 pos = a_position;
+    vec4 pos = a_position;
     vec4 color = a_color0;
     vec2 coords = a_texcoord0;
 
-    color.rgb = toLinearSRGBSomehow(color.bgr, isOverallNTSCJColorGamut);
-    //if (isNotTexture){
-    //  color.rgb = toLinearSRGBSomehow(color.bgr, isOverallNTSCJColorGamut);
-    //}
-    //else{
-    //  color.rgb = toLinearBT1886Appx1Fast(color.bgr);
-    //}
-    //color.rgb = vec3_splat(0.75);
+    color.rgb = toSomeLinearRGB(color.bgr, isOverallNTSCJColorGamut);
 
     if (isTLVertex)
     {
@@ -98,18 +94,10 @@ void main()
             float dotLight2 = saturate(dot(worldNormal, gameLightDir2.xyz));
             float dotLight3 = saturate(dot(worldNormal, gameLightDir3.xyz));
 
-            vec3 light1Ambient = toLinearSRGBSomehow(gameLightColor1.rgb, isOverallNTSCJColorGamut) * dotLight1 * dotLight1;
-            vec3 light2Ambient = toLinearSRGBSomehow(gameLightColor2.rgb, isOverallNTSCJColorGamut) * dotLight2 * dotLight2;
-            vec3 light3Ambient = toLinearSRGBSomehow(gameLightColor3.rgb, isOverallNTSCJColorGamut) * dotLight3 * dotLight3;
-            vec3 lightAmbient = toLinearSRGBSomehow(gameScriptedLightColor.rgb, isOverallNTSCJColorGamut) * (toLinearSRGBSomehow(gameGlobalLightColor.rgb, isOverallNTSCJColorGamut) + light1Ambient + light2Ambient + light3Ambient);
-
-
-            /*
-            vec3 light1Ambient = toLinearBT1886Appx1Fast(gameLightColor1.rgb) * dotLight1 * dotLight1;
-            vec3 light2Ambient = toLinearBT1886Appx1Fast(gameLightColor2.rgb) * dotLight2 * dotLight2;
-            vec3 light3Ambient = toLinearBT1886Appx1Fast(gameLightColor3.rgb) * dotLight3 * dotLight3;
-            vec3 lightAmbient = toLinearBT1886Appx1Fast(gameScriptedLightColor.rgb) * (toLinearBT1886Appx1Fast(gameGlobalLightColor.rgb) + light1Ambient + light2Ambient + light3Ambient);
-            */
+            vec3 light1Ambient = toSomeLinearRGB(gameLightColor1.rgb, isOverallNTSCJColorGamut) * dotLight1 * dotLight1;
+            vec3 light2Ambient = toSomeLinearRGB(gameLightColor2.rgb, isOverallNTSCJColorGamut) * dotLight2 * dotLight2;
+            vec3 light3Ambient = toSomeLinearRGB(gameLightColor3.rgb, isOverallNTSCJColorGamut) * dotLight3 * dotLight3;
+            vec3 lightAmbient = toSomeLinearRGB(gameScriptedLightColor.rgb, isOverallNTSCJColorGamut) * (toSomeLinearRGB(gameGlobalLightColor.rgb, isOverallNTSCJColorGamut) + light1Ambient + light2Ambient + light3Ambient);
 
             color.rgb *= gameGlobalLightColor.w * lightAmbient;
         }

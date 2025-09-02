@@ -51,18 +51,18 @@ void main()
 		}
 		color.rgb = ApplyREC2084Curve(color.rgb, monitorNits);
 		// dither because we increased bit depth
-		// dither in gamma space so dither step size corresponds to quantization step size
+		// dither in gamma space so dither step size is proportional to quantization step size
 		// TODO: If/when a full 10-bit pathway is available for 10-bit FMVs, don't dither those
 		ivec2 dimensions = textureSize(tex_0, 0);
 		color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 2160.0);
 	}
 	else if (isOverallNTSCJColorGamut){
-		color.rgb = GamutLUT(color.rgb);
+		color.rgb = GamutLUT(color.rgb, true, false);
 		color.rgb = toGamma(color.rgb);
 		ivec2 dimensions = textureSize(tex_0, 0);
 		color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 2160.0);
 	}
-	// If not HDR mode nor NTSC-J mode, we should already be in gamma-space sRGG.
+	// If not HDR mode nor NTSC-J mode, we should already be in gamma-space sRGB.
 
 	gl_FragColor = color;
 }

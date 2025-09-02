@@ -20,6 +20,9 @@
 //    GNU General Public License for more details.                          //
 /****************************************************************************/
 
+// This shader is always used for 2D elements.
+// This shader is used for 3D elements when advanced lighting is disabled.
+
 $input v_color0, v_texcoord0, v_position0, v_normal0
 
 #include <bgfx/bgfx_shader.sh>
@@ -104,15 +107,14 @@ uniform vec4 gameScriptedLightColor;
 
 void main()
 {
-    // This stanza pertains to (1) drawing solid colors, or (2) a modifier that's multiplied with a texture.
-    // It gets clobbered if it's a movie.
+    // v_color0 is used for solid 2D colors (e.g., textbox backgrounds), solid-color polygon faces (e.g., all original FF7 models), and colorizing textures
+    // This variable is clobbered for YUV movies.
     vec4 color = v_color0;
-    color.rgb = toLinearSRGBSomehow(color.rgb, isOverallNTSCJColorGamut);
-    //color.rgb = toLinearBT1886Appx1Fast(color.rgb);
+    color.rgb = toSomeLinearRGB(color.rgb, isOverallNTSCJColorGamut);
 
     if (isTexture)
     {
-        // This stanza pertains to movies
+        // All movies except non-steam FF8 use YUV plumbing. (Including FF7 original movies.)
         if (isYUV)
         {
             vec3 yuv = vec3(
@@ -162,23 +164,18 @@ void main()
             }
 
             // Use a different inverse gamma function depending on the FMV's metadata
-            if (isCRTGamma){
-                if (isNTSCJColorGamut)
-                {
-                    // "Color correction" simulation, BT1886 Appendix 1 linearization, gamut conversion, chromatic adaptation, and gamut compression rolled into a LUT
-                    // end result is linear RGB in sRGB gamut
-                    //color.rgb = GamutLUT(color.rgb);
-                    if (isOverallNTSCJColorGamut){
-                        color.rgb = CRTSimulation(color.rgb);
-                    }
-                    else{
-                      color.rgb = GamutLUT(color.rgb);
-                    }
+            // special case -- assume NTSC-J gamut always implies BT1886 Appx1 gamma (and how we deal with that depends on our target gamut)
+            if (isNTSCJColorGamut)
+            {
+                if (isOverallNTSCJColorGamut){
+                    color.rgb = CRTSimulation(color.rgb);
                 }
-                else
-                {
-                  color.rgb = toLinearBT1886Appx1Fast(color.rgb);
+                else{
+                    color.rgb = GamutLUT(color.rgb, true, false);
                 }
+            }
+            else if (isCRTGamma){
+                color.rgb = toLinearBT1886Appx1Fast(color.rgb);
             }
             else if (is2pt2Gamma){
                 color.rgb = toLinear2pt2(color.rgb);
@@ -193,20 +190,26 @@ void main()
                 color.rgb = toLinear(color.rgb);
             }
 
-            // We need to get everything into linear RGB in sRGB gamut
-            //    no change needed for isSRGBColorGamut (BT709 uses same gamut as sRGB)
-            //    no change needed for isNTSCJColorGamut because it was handled above
-            if ((isSMPTECColorGamut) || (isEBUColorGamut))
-            {
-                // Gamut conversion only. Linear in, linear out; LUT contains gamma-space data, but LUT function will linearize it while interpolating
-                color.rgb = MovieGamutLUT(color.rgb);
+            // We need to get everything into linear RGB in our working gamut
+            // (We may draw objects over the top of the movie, so we need to make things consistent **NOW**)
+            if (isOverallNTSCJColorGamut){
+                // do nothing for NTSC-J
+                if ((isSRGBColorGamut) || (isSMPTECColorGamut) || (isEBUColorGamut)){
+                    color.rgb = GamutLUT(color.rgb, false, true);
+                }
             }
-            // TODO: It would be nice to go directly to rec2020 if HDR mode is enabled...
-            // But that would require building a full rec2020 code path.
+            // overall sRGB
+            else {
+                // do nothing for sRGB(/bt709) -- nothing to be done
+                // do nothing for NTSC-J -- already done above
+                if ((isSMPTECColorGamut) || (isEBUColorGamut)){
+                    color.rgb = GamutLUT(color.rgb, false, false);
+                }
+            }
 
             color.a = 1.0;
         }
-        // This stanza pertains to all textures that aren't movies
+        // This stanza pertains to 2D textures (aside from YUV movies) and textures on 3D objects if advanced lighting is disabled
         else
         {
             vec4 texture_color = texture2D(tex_0, v_texcoord0.xy);
@@ -261,9 +264,8 @@ void main()
                 if(all(equal(texture_color.rgb,vec3_splat(0.0)))) discard;
             }
 
-            // linearize, possibly with gamut conversion
-            texture_color.rgb = toLinearSRGBSomehow(texture_color.rgb, isOverallNTSCJColorGamut);
-            //texture_color.rgb = toLinearBT1886Appx1Fast(texture_color.rgb);
+            // linearize
+            texture_color.rgb = toSomeLinearRGB(texture_color.rgb, isOverallNTSCJColorGamut);
 
             // multiply by v_color0
             if (modulateAlpha) color *= texture_color;
@@ -281,8 +283,7 @@ void main()
     if (!(isTLVertex) && isFogEnabled) color.rgb = ApplyWorldFog(color.rgb, v_position0.xyz);
 
     // return to sRGB gamma space so we can do alpha blending the same way FF7/8 did.
-    color.rgb = toGammaSomehow(color.rgb, isOverallNTSCJColorGamut);
-    //color.rgb = toGammaBT1886Appx1Fast(color.rgb);
+    color.rgb = toSomeGammaRGB(color.rgb, isOverallNTSCJColorGamut);
 
     // In this default shader, lighting is applied in gamma space so that it does better match the original lighting
     if ((gameLightingMode == GAME_LIGHTING_PER_PIXEL))
@@ -300,7 +301,7 @@ void main()
     }
     
     // if we did a movie gamut conversion, and won't dither later, then dither now
-    // do this in gamma space so that dither step size corresponds to quantization step size
+    // do this in gamma space so that dither step size is proportional to quantization step size
     if (isTexture && !(isOverallNTSCJColorGamut) && isYUV && !(isSRGBColorGamut))
     {
       ivec2 dimensions = textureSize(tex_0, 0);
