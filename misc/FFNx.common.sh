@@ -436,7 +436,7 @@ vec3 toSomeGammaRGB(vec3 rgb_input, bool ntscjmode)
 // coords: float (range 0-1) pixel coordinates, i.e., v_texcoord0.xy
 // ydims: integer dimensions of first channel's texture
 // udims & vdims: integer dimensions of first second and third channels' textures (may differ from ydim for various yuv formats)
-// scale_divisor: step size divisor to scale the dithering to fit within. E.g., use 255.0 for dithering 8-bit values.
+// scale_divisor: step size divisor to scale the dithering to fit within. E.g., use 256.0 for dithering 8-bit values.
 // xyoffset: value to add to x & y coords. Should be at least 1 to avoid x=0 and y=0. Should be different if the same input is dithered twice.
 // (This function will be used twice if TV-range video is dithered for range expansion, then again for HDR bit depth increase and/or gamut conversion.)
 vec3 QuasirandomDither(vec3 pixelval, vec2 coords, ivec2 ydims, ivec2 udims, ivec2 vdims, float scale_divisor, float xyoffset)

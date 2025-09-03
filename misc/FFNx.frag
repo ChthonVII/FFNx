@@ -128,7 +128,7 @@ void main()
                 ivec2 ydimensions = textureSize(tex_0, 0);
                 ivec2 udimensions = textureSize(tex_1, 0);
                 ivec2 vdimensions = textureSize(tex_2, 0);
-                yuv = QuasirandomDither(yuv, v_texcoord0.xy, ydimensions, udimensions, vdimensions, 255.0, 1.0);
+                yuv = QuasirandomDither(yuv, v_texcoord0.xy, ydimensions, udimensions, vdimensions, 256.0, 1.0);
                 // clamp back to tv range
                 yuv = clamp(yuv, vec3_splat(16.0/255.0), vec3(235.0/255.0, 240.0/255.0, 240.0/255.0));
             }
@@ -305,7 +305,7 @@ void main()
     if (isTexture && !(isOverallNTSCJColorGamut) && isYUV && !(isSRGBColorGamut))
     {
       ivec2 dimensions = textureSize(tex_0, 0);
-      color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 255.0, 4320.0);
+      color.rgb = QuasirandomDither(color.rgb, v_texcoord0.xy, dimensions, dimensions, dimensions, 256.0, 4320.0);
     }
 
     gl_FragColor = color;
