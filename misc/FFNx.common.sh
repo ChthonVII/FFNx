@@ -325,7 +325,7 @@ vec3 InverseCRTSimulation(vec3 rgb_input){
 
 vec3 GamutLUT(vec3 rgb_input, bool crtinput, bool crtvalues)
 {
-	vec3 temp = saturate(rgb_input) * vec3_splat(64.0); // 64 gives the correct number of even-sized segments, plus 1.0 out-of-bounds
+	vec3 temp = saturate(rgb_input) * vec3_splat(63.0); // use 63 b/c LUT is created with left-of-bin DAC to make interpolation here easier
 	vec3 floors = floor(temp);
 	vec3 ceils = ceil(temp);
 	vec3 ceilweights = saturate(temp - floors);
@@ -334,14 +334,10 @@ vec3 GamutLUT(vec3 rgb_input, bool crtinput, bool crtvalues)
 	// But it should be close enough that the error is smaller than quantization error.
 	if (crtinput){
 		vec3 temp_linear = CRTSimulation(rgb_input);
-		vec3 floors_linear = CRTSimulation(floors/vec3_splat(64.0));
-		vec3 ceils_linear = CRTSimulation(ceils/vec3_splat(64.0));
+		vec3 floors_linear = CRTSimulation(floors/vec3_splat(63.0));
+		vec3 ceils_linear = CRTSimulation(ceils/vec3_splat(63.0));
 		ceilweights = saturate((temp_linear - floors_linear) / max((ceils_linear - floors_linear), vec3_splat(0.0000000001))); // avoid div0
 	}
-
-	// clamp 64 for 1.0 input down to 63.
-	floors = min(floors, vec3_splat(63.0));
-	ceils = min(ceils, vec3_splat(63.0));
 
 	// multiply blue by 64, as it is the horizontal "major" axis
 	floors = floors * vec3(1.0, 1.0, 64.0);
